@@ -1,12 +1,39 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import ChapterSection from './components/ChapterSection';
 import ChapterNavigation from './components/ChapterNavigation';
 import ThemeToggle from './components/ThemeToggle';
+import VideoModal from './components/VideoModal';
 import { chapters } from './data/chapters';
 
 function App() {
+  const [videoModal, setVideoModal] = useState<{
+    isOpen: boolean;
+    url: string;
+    title: string;
+  }>({
+    isOpen: false,
+    url: '',
+    title: ''
+  });
+
+  const handleVideoClick = (url: string, title: string) => {
+    setVideoModal({
+      isOpen: true,
+      url,
+      title
+    });
+  };
+
+  const closeVideoModal = () => {
+    setVideoModal({
+      isOpen: false,
+      url: '',
+      title: ''
+    });
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">      
       <Header />
@@ -60,12 +87,19 @@ function App() {
         </div>
         
         {chapters.map((chapter) => (
-          <ChapterSection key={chapter.id} chapter={chapter} />
+          <ChapterSection key={chapter.id} chapter={chapter} onVideoClick={handleVideoClick} />
         ))}
       </main>
       
       <ThemeToggle />
       <Footer />
+      
+      <VideoModal
+        videoUrl={videoModal.url}
+        title={videoModal.title}
+        isOpen={videoModal.isOpen}
+        onClose={closeVideoModal}
+      />
     </div>
   );
 }
