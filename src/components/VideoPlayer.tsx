@@ -28,13 +28,19 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoUrl, title, onClose }) =
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [showSettings, setShowSettings] = useState(false);
-  const [showResolutionMenu, setShowResolutionMenu] = useState(false);
+  const [selectedResolution, setSelectedResolution] = useState('Auto');
   const [isBuffering, setIsBuffering] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout>();
 
   const playbackSpeeds = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4];
-  const resolutions = ['Auto', '1080p', '720p', '480p', '360p'];
+  const resolutions = [
+    { label: 'Auto', value: 'auto' },
+    { label: '1080p', value: '1080' },
+    { label: '720p', value: '720' },
+    { label: '480p', value: '480' },
+    { label: '360p', value: '360' }
+  ];
 
   useEffect(() => {
     const video = videoRef.current;
@@ -44,17 +50,23 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoUrl, title, onClose }) =
     const updateDuration = () => setDuration(video.duration);
     const handleWaiting = () => setIsBuffering(true);
     const handleCanPlay = () => setIsBuffering(false);
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => setIsPlaying(false);
 
     video.addEventListener('timeupdate', updateTime);
     video.addEventListener('loadedmetadata', updateDuration);
     video.addEventListener('waiting', handleWaiting);
     video.addEventListener('canplay', handleCanPlay);
+    video.addEventListener('play', handlePlay);
+    video.addEventListener('pause', handlePause);
 
     return () => {
       video.removeEventListener('timeupdate', updateTime);
       video.removeEventListener('loadedmetadata', updateDuration);
       video.removeEventListener('waiting', handleWaiting);
       video.removeEventListener('canplay', handleCanPlay);
+      video.removeEventListener('play', handlePlay);
+      video.removeEventListener('pause', handlePause);
     };
   }, []);
 
@@ -69,45 +81,51 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoUrl, title, onClose }) =
     };
 
     const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.key === 'f' || e.key === 'F') {
-        e.preventDefault();
-        toggleFullscreen();
-      }
-      if (e.key === ' ' || e.key === 'Spacebar') {
-        e.preventDefault();
-        togglePlay();
-      }
-      if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        skip(-10);
-      }
-      if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        skip(10);
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        const video = videoRef.current;
-        if (video) {
-          const newVolume = Math.min(1, video.volume + 0.1);
-          video.volume = newVolume;
-          setVolume(newVolume);
-          setIsMuted(newVolume === 0);
-        }
-      }
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        const video = videoRef.current;
-        if (video) {
-          const newVolume = Math.max(0, video.volume - 0.1);
-          video.volume = newVolume;
-          setVolume(newVolume);
-          setIsMuted(newVolume === 0);
-        }
-      }
-      if (e.key === 'm' || e.key === 'M') {
-        e.preventDefault();
-        toggleMute();
+      // Prevent default behavior for all our handled keys
+      const video = videoRef.current;
+      if (!video) return;
+
+      switch (e.code) {
+        case 'KeyF':
+          e.preventDefault();
+          toggleFullscreen();
+          break;
+        case 'Space':
+          e.preventDefault();
+          togglePlay();
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          skip(-10);
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          skip(10);
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          const newVolumeUp = Math.min(1, video.volume + 0.1);
+          video.volume = newVolumeUp;
+          setVolume(newVolumeUp);
+          setIsMuted(newVolumeUp === 0);
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          const newVolumeDown = Math.max(0, video.volume - 0.1);
+          video.volume = newVolumeDown;
+          setVolume(newVolumeDown);
+          setIsMuted(newVolumeDown === 0);
+          break;
+        case 'KeyM':
+          e.preventDefault();
+          toggleMute();
+          break;
+        case 'Escape':
+          if (isFullscreen) {
+            e.preventDefault();
+            toggleFullscreen();
+          }
+          break;
       }
     };
 
@@ -124,18 +142,17 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoUrl, title, onClose }) =
       document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
       document.removeEventListener('keydown', handleKeyPress);
     };
-  }, []);
+  }, [isFullscreen]);
 
   const togglePlay = () => {
     const video = videoRef.current;
     if (!video) return;
 
-    if (isPlaying) {
-      video.pause();
+    if (video.paused) {
+      video.play().catch(console.error);
     } else {
-      video.play();
+      video.pause();
     }
-    setIsPlaying(!isPlaying);
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -162,7 +179,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoUrl, title, onClose }) =
     if (!video) return;
 
     if (isMuted) {
-      video.volume = volume;
+      video.volume = volume > 0 ? volume : 0.5;
       setIsMuted(false);
     } else {
       video.volume = 0;
@@ -174,7 +191,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoUrl, title, onClose }) =
     const video = videoRef.current;
     if (!video) return;
 
-    video.currentTime = Math.max(0, Math.min(duration, video.currentTime + seconds));
+    const newTime = Math.max(0, Math.min(duration, video.currentTime + seconds));
+    video.currentTime = newTime;
+    setCurrentTime(newTime);
   };
 
   const toggleFullscreen = () => {
@@ -222,7 +241,29 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoUrl, title, onClose }) =
     setShowSettings(false);
   };
 
+  const changeResolution = (resolution: string, label: string) => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const currentTime = video.currentTime;
+    const wasPlaying = !video.paused;
+    
+    setSelectedResolution(label);
+    
+    // For now, we'll just show the selection since we can't actually change resolution
+    // In a real implementation, you would have different quality URLs
+    console.log(`Resolution changed to: ${label}`);
+    
+    // If you had different quality URLs, you would do:
+    // video.src = getVideoUrlForResolution(resolution);
+    // video.currentTime = currentTime;
+    // if (wasPlaying) video.play();
+    
+    setShowSettings(false);
+  };
+
   const formatTime = (time: number) => {
+    if (isNaN(time)) return '0:00';
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
@@ -236,6 +277,16 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoUrl, title, onClose }) =
     controlsTimeoutRef.current = setTimeout(() => {
       if (isPlaying) setShowControls(false);
     }, 3000);
+  };
+
+  const handleVideoClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    togglePlay();
+  };
+
+  const handleVideoDoubleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    toggleFullscreen();
   };
 
   return (
@@ -266,8 +317,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoUrl, title, onClose }) =
         ref={videoRef}
         src={videoUrl}
         className="w-full h-full object-contain focus:outline-none"
-        onClick={togglePlay}
-        onDoubleClick={toggleFullscreen}
+        onClick={handleVideoClick}
+        onDoubleClick={handleVideoDoubleClick}
+        preload="metadata"
       />
 
       {/* Buffering Indicator */}
@@ -279,13 +331,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoUrl, title, onClose }) =
 
       {/* Play/Pause Overlay */}
       <div 
-        className="absolute inset-0 flex items-center justify-center z-10"
-        onClick={togglePlay}
+        className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none"
       >
         {!isPlaying && !isBuffering && (
-          <button className="p-4 bg-black/50 text-white rounded-full hover:bg-black/70 transition-all">
+          <div className="p-4 bg-black/50 text-white rounded-full">
             <Play size={48} fill="white" />
-          </button>
+          </div>
         )}
       </div>
 
@@ -318,6 +369,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoUrl, title, onClose }) =
             <button
               onClick={() => skip(-10)}
               className="p-2 text-white hover:bg-white/20 rounded-full transition-all"
+              title="Skip backward 10s (←)"
             >
               <SkipBack size={20} />
             </button>
@@ -326,6 +378,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoUrl, title, onClose }) =
             <button
               onClick={() => skip(10)}
               className="p-2 text-white hover:bg-white/20 rounded-full transition-all"
+              title="Skip forward 10s (→)"
             >
               <SkipForward size={20} />
             </button>
@@ -335,6 +388,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoUrl, title, onClose }) =
               <button
                 onClick={toggleMute}
                 className="p-2 text-white hover:bg-white/20 rounded-full transition-all"
+                title="Mute/Unmute (M)"
               >
                 {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
               </button>
@@ -361,14 +415,15 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoUrl, title, onClose }) =
               <button
                 onClick={() => setShowSettings(!showSettings)}
                 className="p-2 text-white hover:bg-white/20 rounded-full transition-all"
+                title="Settings"
               >
                 <Settings size={20} />
               </button>
 
               {showSettings && (
-                <div className="absolute bottom-12 right-0 bg-black/90 backdrop-blur-sm rounded-lg p-2 min-w-48">
+                <div className="absolute bottom-12 right-0 bg-black/90 backdrop-blur-sm rounded-lg p-3 min-w-48">
                   {/* Playback Speed */}
-                  <div className="mb-2">
+                  <div className="mb-4">
                     <p className="text-white text-sm font-semibold mb-2">Playback Speed</p>
                     <div className="grid grid-cols-3 gap-1">
                       {playbackSpeeds.map((speed) => (
@@ -393,10 +448,18 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoUrl, title, onClose }) =
                     <div className="space-y-1">
                       {resolutions.map((resolution) => (
                         <button
-                          key={resolution}
-                          className="block w-full text-left px-2 py-1 text-sm text-white hover:bg-white/20 rounded transition-all"
+                          key={resolution.value}
+                          onClick={() => changeResolution(resolution.value, resolution.label)}
+                          className={`block w-full text-left px-2 py-1 text-sm rounded transition-all ${
+                            selectedResolution === resolution.label
+                              ? 'bg-indigo-600 text-white'
+                              : 'text-white hover:bg-white/20'
+                          }`}
                         >
-                          {resolution}
+                          {resolution.label}
+                          {selectedResolution === resolution.label && (
+                            <span className="ml-2 text-xs">✓</span>
+                          )}
                         </button>
                       ))}
                     </div>
@@ -414,6 +477,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoUrl, title, onClose }) =
               <Maximize size={20} />
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Keyboard Shortcuts Info */}
+      <div className={`absolute top-16 left-4 z-30 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
+        <div className="text-white text-xs bg-black/50 px-2 py-1 rounded backdrop-blur-sm">
+          Space: Play/Pause • ←/→: Skip • ↑/↓: Volume • F: Fullscreen • M: Mute
         </div>
       </div>
 
