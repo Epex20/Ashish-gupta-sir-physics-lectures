@@ -8,7 +8,8 @@ import {
   VolumeX, 
   Maximize, 
   Settings,
-  X
+  X,
+  Download
 } from 'lucide-react';
 
 interface VideoPlayerProps {
@@ -262,6 +263,16 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoUrl, title, onClose }) =
     setShowSettings(false);
   };
 
+  const handleDownload = () => {
+    const link = document.createElement('a');
+    link.href = videoUrl;
+    link.download = `${title}.webm`;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const formatTime = (time: number) => {
     if (isNaN(time)) return '0:00';
     const minutes = Math.floor(time / 60);
@@ -412,6 +423,15 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoUrl, title, onClose }) =
           <div className="flex items-center space-x-2">
             {/* Settings */}
             <div className="relative">
+              {/* Download Button */}
+              <button
+                onClick={handleDownload}
+                className="p-2 text-white hover:bg-white/20 rounded-full transition-all mr-2"
+                title="Download Video"
+              >
+                <Download size={20} />
+              </button>
+
               <button
                 onClick={() => setShowSettings(!showSettings)}
                 className="p-2 text-white hover:bg-white/20 rounded-full transition-all"
@@ -483,7 +503,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoUrl, title, onClose }) =
       {/* Keyboard Shortcuts Info */}
       <div className={`absolute top-16 left-4 z-30 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
         <div className="text-white text-xs bg-black/50 px-2 py-1 rounded backdrop-blur-sm">
-          Space: Play/Pause • ←/→: Skip • ↑/↓: Volume • F: Fullscreen • M: Mute
+          Space: Play/Pause • ←/→: Skip • ↑/↓: Volume • F: Fullscreen • M: Mute • Download Available
         </div>
       </div>
 
